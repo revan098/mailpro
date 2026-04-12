@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🐼 GenPandaz MailPro
 
 > **AI-Powered Outreach Email Generator for Students & Freelancers**
@@ -197,3 +198,6 @@ MIT License — free to use, modify, and distribute.
 **Prathab Murugan** — Built as part of the GenPandaz MailPro vision for democratizing professional outreach for students and freelancers.
 
 > *"The AI Outreach Assistant for Professional Cold Emails."*
+=======
+# Genpandazmailpro
+>>>>>>> 2d96e00850afcb10145b63626d76adabf72e9d70
