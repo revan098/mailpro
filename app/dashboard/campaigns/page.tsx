@@ -1,6 +1,7 @@
 "use client"
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase"
+import { useUser } from "@clerk/nextjs"
+import { supabase } from "@/lib/supabase"
 
 type EmailLog = {
   id: string
@@ -11,30 +12,38 @@ type EmailLog = {
   sent_at: string
 }
 
-const MODE_LABELS: Record<string, string> = {
-  hr_outreach: "HR Outreach", client_approach: "Client Approach",
-  reply_generator: "Reply Generator", follow_up: "Follow Up",
-  linkedin: "LinkedIn Note", referral: "Referral Ask",
-  thank_you: "Thank You", apology: "Apology", cold_dm: "Cold Pitch",
+const ML: Record<string, string> = {
+  hr_outreach:     "HR Outreach",
+  client_approach: "Client Pitch",
+  reply_generator: "Reply",
+  follow_up:       "Follow Up",
+  linkedin:        "LinkedIn",
+  referral:        "Referral",
+  thank_you:       "Thank You",
+  apology:         "Apology",
+  cold_dm:         "Cold Pitch",
 }
 
 export default function CampaignsPage() {
-  const supabase = createClient()
+  const { user, isLoaded } = useUser()
   const [logs,    setLogs]    = useState<EmailLog[]>([])
   const [loading, setLoading] = useState(true)
   const [active,  setActive]  = useState<string | null>(null)
 
-  useEffect(() => { loadLogs() }, [])
+  useEffect(() => { if (isLoaded && user) load() }, [isLoaded, user])
 
-  const loadLogs = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data } = await supabase.from("email_logs").select("*").eq("user_id", user.id).order("sent_at", { ascending: false })
+  const load = async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from("email_logs")
+      .select("*")
+      .eq("user_id", user!.id)
+      .order("sent_at", { ascending: false })
     setLogs(data || [])
     setLoading(false)
   }
 
-  // Group logs by mode → treat each mode as a "campaign"
+  // Group logs by mode — each mode = one campaign card
   const campaigns = Object.entries(
     logs.reduce((acc, log) => {
       if (!acc[log.mode]) acc[log.mode] = []
@@ -43,127 +52,148 @@ export default function CampaignsPage() {
     }, {} as Record<string, EmailLog[]>)
   ).map(([mode, items]) => ({
     mode,
-    label:    MODE_LABELS[mode] || mode,
+    label:    ML[mode] || mode,
     total:    items.length,
     success:  items.filter(i => i.status === "sent").length,
     failed:   items.filter(i => i.status === "failed").length,
     lastSent: items[0]?.sent_at,
     items,
-  })).sort((a,b) => b.total - a.total)
+  })).sort((a, b) => b.total - a.total)
+
+  if (!isLoaded || loading) return (
+    <div className="pg">
+      <div className="pg-hd">
+        <div className="pg-t">Campaigns</div>
+        <div className="pg-s">Your email activity grouped by type</div>
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"13px" }}>
+        {[1,2,3,4].map(i => (
+          <div key={i} className="shim" style={{ height:"140px", borderRadius:"var(--rl)" }} />
+        ))}
+      </div>
+    </div>
+  )
 
   return (
-    <>
-      <style>{`
-        .campaigns{padding:26px 30px}
-        .page-title{font-family:'Syne',sans-serif;font-size:1.7rem;font-weight:800;color:#fff;margin-bottom:4px}
-        .page-title em{color:#FF6200;font-style:normal}
-        .page-sub{font-size:0.8rem;color:#555;margin-bottom:24px}
-        .camp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:24px}
-        .camp-card{background:#111;border:2px solid #1e1e1e;border-radius:14px;padding:18px;cursor:pointer;transition:all 0.18s}
-        .camp-card:hover{border-color:#FF6200;transform:translateY(-2px)}
-        .camp-card.on{border-color:#FF6200;background:#131313}
-        .camp-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-        .camp-name{font-family:'Syne',sans-serif;font-size:0.95rem;font-weight:800;color:#ddd}
-        .camp-date{font-size:0.68rem;color:#444;font-weight:700}
-        .camp-stats{display:flex;gap:10px;margin-bottom:12px}
-        .camp-stat{background:#1a1a1a;border-radius:8px;padding:8px 12px;text-align:center;flex:1}
-        .camp-stat-num{font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;color:#FF6200}
-        .camp-stat-lbl{font-size:0.58rem;color:#555;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:2px}
-        .camp-bar-wrap{width:100%;height:5px;background:#1e1e1e;border-radius:3px;overflow:hidden}
-        .camp-bar{height:100%;background:#22c55e;border-radius:3px;transition:width 0.4s}
-        .detail-section{background:#111;border:2px solid #1e1e1e;border-radius:14px;overflow:hidden;animation:rise 0.3s ease both}
-        @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-        .detail-header{padding:16px 18px;border-bottom:1px solid #1e1e1e;display:flex;align-items:center;justify-content:space-between}
-        .detail-title{font-family:'Syne',sans-serif;font-size:0.85rem;font-weight:800;color:#FF6200;letter-spacing:2px;text-transform:uppercase}
-        .close-btn{background:#1a1a1a;border:1.5px solid #2a2a2a;color:#777;font-family:'Syne',sans-serif;font-size:0.72rem;font-weight:800;border-radius:7px;padding:6px 12px;cursor:pointer;transition:all 0.15s}
-        .close-btn:hover{border-color:#FF6200;color:#FF6200}
-        table{width:100%;border-collapse:collapse}
-        th{text-align:left;font-size:0.6rem;font-weight:800;color:#555;letter-spacing:2px;text-transform:uppercase;padding:10px 14px;border-bottom:1px solid #1a1a1a}
-        td{padding:11px 14px;font-size:0.82rem;font-weight:600;color:#ccc;border-bottom:1px solid #161616}
-        tr:last-child td{border-bottom:none}
-        tr:hover td{background:#131313}
-        .status-sent{background:rgba(34,197,94,0.1);color:#22c55e;border:1px solid #22c55e;font-size:0.65rem;font-weight:800;padding:3px 9px;border-radius:20px}
-        .status-failed{background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid #ef4444;font-size:0.65rem;font-weight:800;padding:3px 9px;border-radius:20px}
-        .empty-state{text-align:center;padding:60px 20px;color:#333;font-size:0.85rem}
-        .empty-state b{color:#FF6200}
-      `}</style>
+    <div className="pg">
+      <div className="pg-hd" style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <div>
+          <div className="pg-t">Campaigns</div>
+          <div className="pg-s">Your email activity grouped by type — click any card to expand</div>
+        </div>
+        <button className="btn btn-s btn-sm" onClick={load}>↻ Refresh</button>
+      </div>
 
-      <div className="campaigns">
-        <div className="page-title">CAMPAIGN <em>HISTORY</em></div>
-        <div className="page-sub">Your emails grouped by type — click any campaign to see all recipients</div>
-
-        {loading ? (
-          <div style={{color:"#555",padding:"40px",textAlign:"center"}}>Loading campaigns...</div>
-        ) : campaigns.length === 0 ? (
-          <div className="empty-state">No campaigns yet.<br /><b>Send your first email</b> from the Compose tab.</div>
-        ) : (
-          <>
-            <div className="camp-grid">
-              {campaigns.map(c => (
-                <div key={c.mode} className={`camp-card ${active === c.mode ? "on" : ""}`}
-                  onClick={() => setActive(active === c.mode ? null : c.mode)}>
-                  <div className="camp-header">
-                    <div className="camp-name">{c.label}</div>
-                    <div className="camp-date">
-                      {c.lastSent ? new Date(c.lastSent).toLocaleDateString("en",{month:"short",day:"numeric"}) : ""}
-                    </div>
-                  </div>
-                  <div className="camp-stats">
-                    <div className="camp-stat">
-                      <div className="camp-stat-num">{c.total}</div>
-                      <div className="camp-stat-lbl">Sent</div>
-                    </div>
-                    <div className="camp-stat">
-                      <div className="camp-stat-num">{c.success}</div>
-                      <div className="camp-stat-lbl">Success</div>
-                    </div>
-                    <div className="camp-stat">
-                      <div className="camp-stat-num">{c.failed}</div>
-                      <div className="camp-stat-lbl">Failed</div>
-                    </div>
-                    <div className="camp-stat">
-                      <div className="camp-stat-num">{c.total > 0 ? Math.round((c.success/c.total)*100) : 0}%</div>
-                      <div className="camp-stat-lbl">Rate</div>
-                    </div>
-                  </div>
-                  <div className="camp-bar-wrap">
-                    <div className="camp-bar" style={{width:`${c.total > 0 ? (c.success/c.total)*100 : 0}%`}} />
+      {campaigns.length === 0 ? (
+        <div className="card" style={{ padding:"60px 20px", textAlign:"center" }}>
+          <div style={{ fontSize:"48px", opacity:.2, marginBottom:"12px" }}>📊</div>
+          <div style={{ fontSize:".95rem", fontWeight:700, color:"var(--t3)", marginBottom:"6px" }}>
+            No campaigns yet
+          </div>
+          <div style={{ fontSize:".82rem", color:"var(--t4)" }}>
+            Send your first email from the Compose tab and it will appear here.
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* CAMPAIGN CARDS */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:"13px", marginBottom:"20px" }}>
+            {campaigns.map(c => (
+              <div
+                key={c.mode}
+                onClick={() => setActive(active === c.mode ? null : c.mode)}
+                style={{
+                  background: "var(--s)",
+                  border: `1px solid ${active === c.mode ? "var(--p)" : "var(--bd)"}`,
+                  borderRadius: "var(--rl)",
+                  padding: "18px",
+                  cursor: "pointer",
+                  transition: "all .15s",
+                  boxShadow: active === c.mode ? "0 0 0 3px var(--p-b)" : "var(--xs)",
+                }}
+              >
+                {/* Header */}
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"12px" }}>
+                  <div style={{ fontSize:".92rem", fontWeight:700, color:"var(--t1)" }}>{c.label}</div>
+                  <div style={{ fontSize:".72rem", color:"var(--t4)" }}>
+                    {c.lastSent
+                      ? new Date(c.lastSent).toLocaleDateString("en", { month:"short", day:"numeric" })
+                      : ""}
                   </div>
                 </div>
-              ))}
-            </div>
 
-            {/* DETAIL VIEW */}
-            {active && (() => {
-              const camp = campaigns.find(c => c.mode === active)
-              if (!camp) return null
-              return (
-                <div className="detail-section">
-                  <div className="detail-header">
-                    <div className="detail-title">{camp.label} — All Recipients</div>
-                    <button className="close-btn" onClick={() => setActive(null)}>Close</button>
-                  </div>
+                {/* Stats */}
+                <div style={{ display:"flex", gap:"10px", marginBottom:"12px" }}>
+                  {[
+                    { n: c.total,   l: "Sent"    },
+                    { n: c.success, l: "Success" },
+                    { n: c.failed,  l: "Failed"  },
+                    { n: c.total > 0 ? Math.round((c.success / c.total) * 100) + "%" : "0%", l: "Rate" },
+                  ].map((s, i) => (
+                    <div key={i} style={{ flex:1, background:"var(--s2)", borderRadius:"var(--r)", padding:"8px 6px", textAlign:"center" }}>
+                      <div style={{ fontFamily:"Inter,sans-serif", fontSize:"1.1rem", fontWeight:800, color:"var(--p-t)", letterSpacing:"-.02em" }}>{s.n}</div>
+                      <div style={{ fontSize:".6rem", fontWeight:700, color:"var(--t4)", textTransform:"uppercase", letterSpacing:".06em", marginTop:"2px" }}>{s.l}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Progress bar */}
+                <div style={{ width:"100%", height:"5px", background:"var(--s2)", borderRadius:"4px", overflow:"hidden" }}>
+                  <div style={{ height:"100%", background:"var(--p)", borderRadius:"4px", width:`${c.total > 0 ? (c.success / c.total) * 100 : 0}%`, transition:"width .5s ease" }} />
+                </div>
+
+                <div style={{ fontSize:".7rem", color:"var(--t4)", marginTop:"8px" }}>
+                  {active === c.mode ? "▲ Click to collapse" : "▼ Click to see all recipients"}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* DETAIL TABLE */}
+          {active && (() => {
+            const camp = campaigns.find(c => c.mode === active)
+            if (!camp) return null
+            return (
+              <div className="tw au">
+                <div className="tw-h">
+                  <span className="tw-ht">{camp.label} — All Recipients ({camp.items.length})</span>
+                  <button className="btn btn-g btn-sm" onClick={() => setActive(null)}>Close ✕</button>
+                </div>
+                <div style={{ overflowX:"auto" }}>
                   <table>
-                    <thead><tr>
-                      <th>Recipient</th><th>Subject</th><th>Status</th><th>Date</th>
-                    </tr></thead>
+                    <thead>
+                      <tr>
+                        <th>Recipient</th>
+                        <th className="d-only">Subject</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                      </tr>
+                    </thead>
                     <tbody>
                       {camp.items.map(log => (
                         <tr key={log.id}>
-                          <td style={{color:"#888"}}>{log.to_email}</td>
-                          <td style={{color:"#666",maxWidth:"240px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{log.subject || "—"}</td>
-                          <td><span className={log.status === "sent" ? "status-sent" : "status-failed"}>{log.status}</span></td>
-                          <td style={{color:"#555",fontSize:"0.78rem"}}>{new Date(log.sent_at).toLocaleDateString("en",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</td>
+                          <td style={{ color:"var(--t2)" }}>{log.to_email}</td>
+                          <td className="d-only" style={{ color:"var(--t3)", maxWidth:"220px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                            {log.subject || "—"}
+                          </td>
+                          <td>
+                            <span className={`bdg ${log.status === "sent" ? "bdg-g" : "bdg-r"}`}>
+                              {log.status}
+                            </span>
+                          </td>
+                          <td style={{ color:"var(--t4)", fontSize:".78rem", whiteSpace:"nowrap" }}>
+                            {new Date(log.sent_at).toLocaleDateString("en", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" })}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              )
-            })()}
-          </>
-        )}
-      </div>
-    </>
+              </div>
+            )
+          })()}
+        </>
+      )}
+    </div>
   )
 }
