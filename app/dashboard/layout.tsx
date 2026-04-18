@@ -32,7 +32,7 @@ export default function DashLayout({ children }: { children: ReactNode }) {
         <header className="topbar">
           <Link href="/dashboard" className="t-brand">
             <div className="t-mark">🐼</div>
-            <span className="t-name d-only">Pandaz <span>MailPro</span></span>
+            <span className="t-name d-only">GenpandaZ <span>MailPro</span></span>
           </Link>
           <div className="t-body">
             <span className="t-page">{title}</span>

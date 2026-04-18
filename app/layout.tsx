@@ -3,7 +3,7 @@ import { ClerkProvider } from "@clerk/nextjs"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Panda Mail — AI Email Generator",
+  title: "GenPandaZ Mailpro — AI Email Generator",
   description: "AI-powered outreach email generator for GenPandaZ team",
 }
 export const viewport: Viewport = {
