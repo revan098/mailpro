@@ -30,9 +30,9 @@ export default function HomePage() {
       <div className="hero">
         <div className="logo-r">
           <div className="lm">🐼</div>
-          <div className="ln">GenPandaZ <span>MailPro </span></div>
+          <div className="ln">GenpandaZ <span>MailPro </span></div>
         </div>
-        <div className="hb">✨ GenPandaZ Internal Tool · Free · No limits</div>
+        <div className="hb">✨ GenpandaZ Internal Tool · Free · No limits</div>
         <h1>Write perfect outreach emails<br />with <span>AI assistance</span></h1>
         <p className="hs">Generate professional cold emails for jobs, clients, referrals and more. Sign in with your Google account and start writing instantly.</p>
         <div className="cta-r">
